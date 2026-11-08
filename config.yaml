@@ -12,7 +12,7 @@ sources:
   # YouTube: use either handle or channel_id (channel_id is the most reliable)
   - platform: youtube
     name: MMCrypto
-    handle: "UCBkGMys0mYl3Myxh3CTsASA"
+    channel_id: "UCBkGMys0mYl3Myxh3CTsASA"
   # - platform: youtube
   #   name: Some Channel
   #   channel_id: UCxxxxxxxxxxxxxxxxxxxxxx
