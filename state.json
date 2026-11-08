@@ -1,1 +1,14 @@
-{}
+{
+ "heartbeat": "2026-11-08",
+ "sources": {
+  "x:mmcrypto": {
+   "fails": 1
+  },
+  "youtube:@mmcryptotube": {
+   "fails": 1,
+   "meta": {
+    "channel_id": "UCBkGMys0mYl3Myxh3CTsASA"
+   }
+  }
+ }
+}
