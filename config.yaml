@@ -1,0 +1,25 @@
+# ---- Your watch list ----
+# Replace the examples below with your own. Add as many as you like.
+# To add a new platform later, just add a file in plugins/ (see README).
+
+settings:
+  # Optional, for X: your own Nitter instance(s). Leave empty if unused.
+  nitter_instances: []
+  # Get a Telegram warning if a source fails this many runs in a row (once).
+  warn_after_failures: 12
+
+sources:
+  # YouTube: use either handle or channel_id (channel_id is the most reliable)
+  - platform: youtube
+    name: Marques Brownlee
+    handle: "@mkbhd"
+  # - platform: youtube
+  #   name: Some Channel
+  #   channel_id: UCxxxxxxxxxxxxxxxxxxxxxx
+
+  # X (Twitter): original posts only by default
+  - platform: x
+    name: NASA
+    username: NASA
+    # include_replies: false
+    # include_reposts: false
