@@ -2,7 +2,7 @@
  "heartbeat": "2026-11-08",
  "sources": {
   "x:mmcrypto": {
-   "fails": 3
+   "fails": 4
   },
   "youtube:@mmcryptotube": {
    "fails": 1,
@@ -11,8 +11,26 @@
    }
   },
   "youtube:ucbkgmys0myl3myxh3ctsasa": {
-   "fails": 2,
-   "meta": {}
+   "fails": 0,
+   "meta": {},
+   "seen": [
+    "v5UnfN3wN4A",
+    "urst9mvFF7g",
+    "YEHeAkvG5Xc",
+    "whywCBJv26M",
+    "UBMPJYiDIr0",
+    "5_N2EIMY1Ds",
+    "v04Ft3nmxek",
+    "dXJdOGSM3nk",
+    "lj_W8wamFx8",
+    "9dXfSIkt9NY",
+    "m5Xsy0Pfdfw",
+    "wtU4zdIJH1Y",
+    "inwioIIkIPY",
+    "FbghHd86MwA",
+    "kXp_XEm_5EA"
+   ],
+   "warned": false
   }
  }
 }
