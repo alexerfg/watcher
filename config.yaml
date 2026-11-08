@@ -11,15 +11,15 @@ settings:
 sources:
   # YouTube: use either handle or channel_id (channel_id is the most reliable)
   - platform: youtube
-    name: Marques Brownlee
-    handle: "@mkbhd"
+    name: MMCrypto
+    handle: "@MMCryptoTube"
   # - platform: youtube
   #   name: Some Channel
   #   channel_id: UCxxxxxxxxxxxxxxxxxxxxxx
 
   # X (Twitter): original posts only by default
   - platform: x
-    name: NASA
-    username: NASA
+    name: MMCrypto (X)
+    username: MMCrypto
     # include_replies: false
     # include_reposts: false
