@@ -1,8 +1,8 @@
 {
- "heartbeat": "2026-11-08",
+ "heartbeat": "2026-11-09",
  "sources": {
   "x:mmcrypto": {
-   "fails": 8
+   "fails": 9
   },
   "youtube:@mmcryptotube": {
    "fails": 1,
