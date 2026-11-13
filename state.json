@@ -1,8 +1,8 @@
 {
- "heartbeat": "2026-11-12",
+ "heartbeat": "2026-11-13",
  "sources": {
   "x:mmcrypto": {
-   "fails": 23,
+   "fails": 24,
    "warned": true
   },
   "youtube:@mmcryptotube": {
