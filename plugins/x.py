@@ -83,6 +83,15 @@ async def _via_twikit(user, entry, include_replies, include_reposts):
     return _sort_newest_first(items)
 
 
+def _safe(msg, limit=160):
+    """Shorten an error message and hide secret values before logging it."""
+    for name in ("X_AUTH_TOKEN", "X_CT0"):
+        val = os.environ.get(name)
+        if val:
+            msg = msg.replace(val, "***")
+    return msg[:limit]
+
+
 def fetch(src, entry, settings):
     user = key(src)
     inc_r = bool(src.get("include_replies", False))
@@ -98,7 +107,7 @@ def fetch(src, entry, settings):
         try:
             return asyncio.run(_via_twikit(user, entry, inc_r, inc_rt))
         except Exception as e:
-            errors.append(f"twikit -> {type(e).__name__}")
+            errors.append(f"twikit -> {type(e).__name__}: {_safe(str(e))}")
     if not errors:
         errors.append("no X method configured (set nitter_instances or X_AUTH_TOKEN/X_CT0)")
     raise RuntimeError("; ".join(errors))
