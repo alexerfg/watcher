@@ -137,6 +137,48 @@ def _clean(value):
     return (value or "").strip().strip("'\"").strip()
 
 
+def _find_tweets(data):
+    """Collect tweet objects from X's raw timeline JSON (skips the pinned one)."""
+    found = []
+
+    def walk(o):
+        if isinstance(o, dict):
+            if o.get("type") == "TimelinePinEntry":
+                return
+            tr = o.get("tweet_results")
+            if isinstance(tr, dict) and isinstance(tr.get("result"), dict):
+                found.append(tr["result"])
+                return
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(data)
+    return found
+
+
+def parse_timeline(data, user, include_replies, include_reposts):
+    items, seen = [], set()
+    for r in _find_tweets(data):
+        r = r.get("tweet", r)                      # "TweetWithVisibilityResults"
+        legacy = r.get("legacy") or {}
+        tid = str(r.get("rest_id") or legacy.get("id_str") or "")
+        if not tid.isdigit() or tid in seen:
+            continue
+        text = (((r.get("note_tweet") or {}).get("note_tweet_results") or {})
+                .get("result", {}).get("text")) or legacy.get("full_text") or "New post"
+        if ("retweeted_status_result" in legacy or text.startswith("RT @")) and not include_reposts:
+            continue
+        if legacy.get("in_reply_to_status_id_str") and not include_replies:
+            continue
+        seen.add(tid)
+        items.append({"id": tid, "title": text[:400],
+                      "url": f"https://x.com/{user}/status/{tid}"})
+    return _sort_newest_first(items)
+
+
 async def _via_twikit(user, entry, include_replies, include_reposts):
     from twikit import Client  # imported lazily so YouTube works without it
     _patch_twikit()
@@ -146,20 +188,16 @@ async def _via_twikit(user, entry, include_replies, include_reposts):
     client.set_cookies({"auth_token": auth, "ct0": ct0})
     meta = entry.setdefault("meta", {})
     uid = meta.get("user_id")
+    # Raw API calls: Twikit's own User/Tweet parsing crashes on missing fields.
     if not uid:
-        uid = (await _retry_csrf(client.get_user_by_screen_name, user)).id
+        resp, _ = await _retry_csrf(client.gql.user_by_screen_name, user)
+        result = ((resp.get("data") or {}).get("user") or {}).get("result") or {}
+        uid = result.get("rest_id")
+        if not uid:
+            raise RuntimeError(f"user not found or unavailable ({result.get('__typename', 'no result')})")
         meta["user_id"] = uid
-    tweets = await _retry_csrf(client.get_user_tweets, uid, "Tweets", count=20)
-    items = []
-    for t in tweets:
-        if getattr(t, "retweeted_tweet", None) and not include_reposts:
-            continue
-        if getattr(t, "in_reply_to", None) and not include_replies:
-            continue
-        text = getattr(t, "full_text", None) or getattr(t, "text", "") or "New post"
-        items.append({"id": str(t.id), "title": text[:400],
-                      "url": f"https://x.com/{user}/status/{t.id}"})
-    return _sort_newest_first(items)
+    resp, _ = await _retry_csrf(client.gql.user_tweets, uid, 20, None)
+    return parse_timeline(resp, user, include_replies, include_reposts)
 
 
 def _safe(msg, limit=300):
