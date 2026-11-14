@@ -5,12 +5,14 @@ Method 2 - Twikit: used if secrets X_AUTH_TOKEN and X_CT0 are set (throwaway
            X account recommended). Cloud/datacenter IPs may get blocked by X.
 """
 import asyncio
+import logging
 import os
 import re
 import xml.etree.ElementTree as ET
 
 import requests
 
+log = logging.getLogger("watcher")
 NAME = "x"
 EMOJI = "🐦"
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -108,19 +110,46 @@ def _patch_twikit():
     ClientTransaction.get_indices = get_indices
     ClientTransaction._patched_by_watcher = True
 
+    # X rotates the ct0 cookie when it rejects a request. Twikit kept the OLD
+    # one; keep the NEWEST instead so a retry can succeed.
+    from twikit.client.client import Client as _Client
+
+    def keep_latest_ct0(self):
+        cookies = {}
+        for cookie in self.http.cookies.jar:
+            cookies[cookie.name] = cookie.value      # later entries win
+        self.http.cookies = list(cookies.items())
+
+    _Client._remove_duplicate_ct0_cookie = keep_latest_ct0
+
+
+async def _retry_csrf(fn, *args, **kwargs):
+    """X answers a stale ct0 with 403/353 and a fresh ct0; retry once."""
+    try:
+        return await fn(*args, **kwargs)
+    except Exception as e:
+        if "353" in str(e) or "csrf" in str(e).lower():
+            return await fn(*args, **kwargs)
+        raise
+
+
+def _clean(value):
+    return (value or "").strip().strip("'\"").strip()
+
 
 async def _via_twikit(user, entry, include_replies, include_reposts):
     from twikit import Client  # imported lazily so YouTube works without it
     _patch_twikit()
+    auth, ct0 = _clean(os.environ["X_AUTH_TOKEN"]), _clean(os.environ["X_CT0"])
+    log.info("X cookies: auth_token length=%d, ct0 length=%d", len(auth), len(ct0))
     client = Client("en-US")
-    client.set_cookies({"auth_token": os.environ["X_AUTH_TOKEN"],
-                        "ct0": os.environ["X_CT0"]})
+    client.set_cookies({"auth_token": auth, "ct0": ct0})
     meta = entry.setdefault("meta", {})
     uid = meta.get("user_id")
     if not uid:
-        uid = (await client.get_user_by_screen_name(user)).id
+        uid = (await _retry_csrf(client.get_user_by_screen_name, user)).id
         meta["user_id"] = uid
-    tweets = await client.get_user_tweets(uid, "Tweets", count=20)
+    tweets = await _retry_csrf(client.get_user_tweets, uid, "Tweets", count=20)
     items = []
     for t in tweets:
         if getattr(t, "retweeted_tweet", None) and not include_reposts:
@@ -133,7 +162,7 @@ async def _via_twikit(user, entry, include_replies, include_reposts):
     return _sort_newest_first(items)
 
 
-def _safe(msg, limit=160):
+def _safe(msg, limit=300):
     """Shorten an error message and hide secret values before logging it."""
     for name in ("X_AUTH_TOKEN", "X_CT0"):
         val = os.environ.get(name)
