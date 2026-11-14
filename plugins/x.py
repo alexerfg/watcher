@@ -60,8 +60,58 @@ def _via_nitter(user, instances, include_replies, include_reposts):
     raise RuntimeError(f"all Nitter instances failed ({last})")
 
 
+# ---- Twikit 2.3.3 patch -------------------------------------------------
+# x.com changed how its home page lists the "ondemand.s" script, so the
+# published Twikit fails with "Couldn't get KEY_BYTE indices". This replaces
+# that one method with a tolerant version (old and new page layouts).
+_OLD_HASH_RE = re.compile(r"""['"]ondemand\.s['"]\s*:\s*['"](\w*)['"]""")
+_CHUNK_NAME_RE = re.compile(r"""['"]?(\d+)['"]?\s*:\s*['"]ondemand\.s['"]""")
+_INDICES_RE = re.compile(r"\w\[(\d{1,2})\],\s*16")
+
+
+def _find_hash(page):
+    m = _OLD_HASH_RE.search(page)
+    if m and m.group(1):
+        return m.group(1)
+    c = _CHUNK_NAME_RE.search(page)
+    if c:
+        cid = re.escape(c.group(1))
+        for h in re.finditer(rf"""['"]?{cid}['"]?\s*:\s*['"]([0-9A-Za-z]{{5,}})['"]""", page):
+            if h.group(1) != "ondemand":
+                return h.group(1)
+    return None
+
+
+def _patch_twikit():
+    from twikit.x_client_transaction.transaction import ClientTransaction
+
+    if getattr(ClientTransaction, "_patched_by_watcher", False):
+        return
+
+    async def get_indices(self, home_page_response, session, headers):
+        response = self.validate_response(home_page_response) or self.home_page_response
+        page = str(response)
+        file_hash = _find_hash(page)
+        if not file_hash:
+            i = page.find("ondemand.s")
+            snippet = page[max(0, i - 40): i + 80].replace("\n", " ") if i >= 0 else "none"
+            raise RuntimeError(f"ondemand.s hash not found (page {len(page)} chars; "
+                               f"mentions={page.count('ondemand')}; near: {snippet})")
+        url = f"https://abs.twimg.com/responsive-web/client-web/ondemand.s.{file_hash}a.js"
+        r = await session.request(method="GET", url=url, headers=headers)
+        found = [int(m.group(1)) for m in _INDICES_RE.finditer(str(r.text))]
+        if len(found) < 2:
+            raise RuntimeError(f"no key indices in ondemand file (hash {file_hash}, "
+                               f"{len(str(r.text))} chars, HTTP {getattr(r, 'status_code', '?')})")
+        return found[0], found[1:]
+
+    ClientTransaction.get_indices = get_indices
+    ClientTransaction._patched_by_watcher = True
+
+
 async def _via_twikit(user, entry, include_replies, include_reposts):
     from twikit import Client  # imported lazily so YouTube works without it
+    _patch_twikit()
     client = Client("en-US")
     client.set_cookies({"auth_token": os.environ["X_AUTH_TOKEN"],
                         "ct0": os.environ["X_CT0"]})
